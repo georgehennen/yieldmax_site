@@ -1,0 +1,61 @@
+{% extends "base_auth.html" %}
+
+{% block title %}Login - YieldMax Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card">
+             <div class="card-header text-center"><h5>Sign In</h5></div>
+            <div class="card-body">
+                {% if form.errors %}
+                    <div class="alert alert-danger" role="alert">
+                        Your username and password didn't match. Please try again.
+                    </div>
+                {% endif %}
+
+                {% if next %}
+                    {% if user.is_authenticated %}
+                    <div class="alert alert-info">
+                        Your account doesn't have access to this page. To proceed,
+                        please login with an account that has access.
+                    </div>
+                    {% else %}
+                    <!-- <p>Please login to see this page.</p> -->
+                    {% endif %}
+                {% endif %}
+
+                <form method="post" action="{% url 'login' %}">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.username.id_for_label }}" class="form-label">{{ form.username.label }}</label>
+                        <input type="text" name="{{ form.username.name }}" id="{{ form.username.id_for_label }}" class="form-control form-control-lg" placeholder="Username" required autofocus>
+                        {% if form.username.errors %}
+                            <div class="text-danger mt-1"><small>{{ form.username.errors|join:", " }}</small></div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.password.id_for_label }}" class="form-label">{{ form.password.label }}</label>
+                        <input type="password" name="{{ form.password.name }}" id="{{ form.password.id_for_label }}" class="form-control form-control-lg" placeholder="Password" required>
+                         {% if form.password.errors %}
+                            <div class="text-danger mt-1"><small>{{ form.password.errors|join:", " }}</small></div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">Login</button>
+                    </div>
+                    <input type="hidden" name="next" value="{{ next }}">
+                </form>
+                <div class="mt-3 text-center">
+                    <small><a href="{% url 'password_reset' %}" class="text-muted">Forgot password?</a></small>
+                    <hr class="my-2">
+                    <small>Don't have an account? <a href="{% url 'home:register' %}">Sign Up</a></small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

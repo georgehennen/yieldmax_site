@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Welcome - YieldMax Tracker{% endblock %}
+{% block content %}
+<div class="container py-5">
+    <div class="p-5 text-center bg-dark rounded-3">
+        <i class="bi bi-bar-chart-line-fill" style="font-size: 4rem; color: #007bff;"></i>
+        <h1 class="text-body-emphasis mt-3">Welcome to YieldMax Tracker</h1>
+        <p class="col-lg-8 mx-auto fs-5 text-muted">
+            Track your high-yield ETF portfolio, screen for opportunities, and simulate your investment strategies.
+        </p>
+        <div class="d-inline-flex gap-2 mb-5">
+            <a href="{% url 'screener:index' %}" class="d-inline-flex align-items-center btn btn-primary btn-lg px-4 rounded-pill" role="button">
+                <i class="bi bi-funnel-fill me-2"></i>
+                Go to Screener
+            </a>
+            <a href="{% url 'home:register' %}" class="btn btn-outline-secondary btn-lg px-4 rounded-pill" role="button">
+                Register for Free
+            </a>
+            <a href="{% url 'login' %}" class="btn btn-outline-success btn-lg px-4 rounded-pill" role="button">
+                Login
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

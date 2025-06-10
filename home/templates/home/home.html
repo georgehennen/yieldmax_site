@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+{% load math_filters %}
+{% load l10n %} 
+
+
+{% block title %}Dashboard - YieldMax Tracker{% endblock %}
+
+{% block page_title %}
+    {% if user.is_authenticated %}My Dashboard{% else %}Welcome{% endif %}
+{% endblock %} 
+
+{% block page_actions %}
+    {% if user.is_authenticated %}
+        <button type="button" class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#goalSettingsModal">
+            <i class="bi bi-pencil-square"></i> Edit Goals
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-info me-2" data-bs-toggle="modal" data-bs-target="#financialSettingsModal">
+            <i class="bi bi-gear-fill"></i> Financial Settings
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#addLotModal">
+            <i class="bi bi-plus-circle-fill"></i> Add New Lot
+        </button>
+    {% endif %}
+{% endblock %}
+
+{% block modals %}
+    {% if user.is_authenticated %}
+    <div class="modal fade" id="goalSettingsModal" tabindex="-1" aria-labelledby="goalSettingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="{% url 'home:dashboard' %}"> 
+                    {% csrf_token %}
+                    <div class="modal-header"><h5 class="modal-title" id="goalSettingsModalLabel">🎯 Goal Settings</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">
+                        {% if goal_form %} 
+                            {% for field in goal_form %}
+                                <div class="mb-3">
+                                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+                                    {% if field.errors %}<div class="text-danger mt-1"><small>{{ field.errors|join:", " }}</small></div>{% endif %}
+                                </div>
+                            {% endfor %}
+                        {% else %}<p>Goal form not available.</p>{% endif %}
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button><button type="submit" name="update_goals" class="btn btn-primary">Save Goals</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="financialSettingsModal" tabindex="-1" aria-labelledby="financialSettingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="{% url 'home:dashboard' %}">
+                    {% csrf_token %}
+                    <div class="modal-header"><h5 class="modal-title" id="financialSettingsModalLabel"><i class="bi bi-gear-fill"></i> Financial Settings</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">
+                        {% if financial_settings_form %}
+                            {% for field in financial_settings_form %} 
+                            <div class="mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}
+                                {% if field.errors %}<div class="text-danger mt-1"><small>{{ field.errors|join:", " }}</small></div>{% endif %}
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p>Financial settings form not available.</p>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button><button type="submit" name="update_financial_settings" class="btn btn-primary">Save Settings</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="addLotModal" tabindex="-1" aria-labelledby="addLotModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="{% url 'home:dashboard' %}">
+                    {% csrf_token %}
+                    <div class="modal-header"><h5 class="modal-title" id="addLotModalLabel">➕ Add New Lot</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                    <div class="modal-body">
+                        {% if lot_form %}
+                            {% for field in lot_form %}
+                            <div class="mb-3"><label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}{% if field.errors %}<div class="text-danger mt-1"><small>{{ field.errors|join:", " }}</small></div>{% endif %}</div>
+                            {% endfor %}
+                        {% else %}<p>Lot form not available.</p>{% endif %}
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button><button type="submit" name="add_lot" class="btn btn-success">Add Lot</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}
+
+
+{% block content %}
+    {% if user.is_authenticated %}
+        <!-- For logged-in users, show the dashboard with a loading spinner -->
+        <div id="loading-spinner" class="text-center mt-5">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"><span class="visually-hidden">Loading...</span></div>
+            <p class="mt-2">Fetching your portfolio data...</p>
+        </div>
+        <div id="dashboard-content" style="display: none;"></div>
+        <div id="no-lots-message" class="alert alert-info" style="display: none;">You haven't added any lots yet. Click the "Add New Lot" button at the top right to start tracking!</div>
+    {% else %}
+        <!-- For anonymous users, show the landing page content -->
+        <div class="container py-5">
+            <div class="p-5 text-center bg-dark rounded-3">
+                <i class="bi bi-bar-chart-line-fill" style="font-size: 4rem; color: #007bff;"></i>
+                <h1 class="text-body-emphasis mt-3">Welcome to YieldMax Tracker</h1>
+                <p class="col-lg-8 mx-auto fs-5 text-muted">Track your high-yield ETF portfolio, screen for opportunities, and simulate your investment strategies.</p>
+                <div class="d-inline-flex gap-2 mb-5">
+                    <a href="{% url 'screener:index' %}" class="d-inline-flex align-items-center btn btn-primary btn-lg px-4 rounded-pill" role="button"><i class="bi bi-funnel-fill me-2"></i> Go to Screener</a>
+                    <a href="{% url 'login' %}" class="btn btn-outline-success btn-lg px-4 rounded-pill" role="button">Login</a>
+                    <a href="{% url 'home:register' %}" class="btn btn-outline-secondary btn-lg px-4 rounded-pill" role="button">Register to Track your Portfolio</a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+    {% if user.is_authenticated %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const dashboardContent = document.getElementById('dashboard-content');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const noLotsMessage = document.getElementById('no-lots-message');
+
+        const formatCurrency = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0);
+        const formatPercent = (value, decimals = 1) => `${parseFloat(value || 0).toFixed(decimals)}%`;
+        
+        fetch("{% url 'home:get_portfolio_data' %}")
+            .then(response => {
+                if (!response.ok) { 
+                    if (response.status === 403) { loadingSpinner.innerHTML = `<div class="alert alert-warning">Please log in to view your dashboard.</div>`; } 
+                    else { throw new Error(`HTTP error! status: ${response.status}`); }
+                    return null;
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data) return; 
+                
+                console.log("Received portfolio data:", data);
+                loadingSpinner.style.display = 'none';
+
+                if (!data.has_lots) { noLotsMessage.style.display = 'block'; return; }
+
+                dashboardContent.style.display = 'block';
+                buildDashboard(data);
+                initializeCharts(data);
+                makeTablesSortable();
+                localizeTimestamp(data.last_data_pull);
+            })
+            .catch(error => {
+                console.error('Error fetching portfolio data:', error);
+                loadingSpinner.innerHTML = `<div class="alert alert-danger">Failed to load portfolio data. Please try again later.</div>`;
+            });
+        
+        function buildDashboard(data) {
+            const metrics = data.metrics || {};
+            const portfolioSummary = data.portfolio_summary_table_data || [];
+            const lotsData = data.lots_data || [];
+            
+            const contentHTML = `
+                <div class="card mb-4">
+                    <div class="card-header">📈 Overall Summary Visuals</div>
+                    <div class="card-body"><div class="row">
+                        <div class="col-md-6 col-lg-4 mb-4"><h6 class="text-center mb-2">Net Liquidation Value Goal</h6><div class="chart-container" style="height:220px;"><canvas id="nlvGoalChart"></canvas><div id="nlvGoalChartFallback" class="chart-fallback-text" style="display:none;">Set NLV Goal.</div></div><p class="text-center mt-2 mb-0 small">Current NLV: ${formatCurrency(metrics.net_liquidation_value)}<br>Goal: ${formatCurrency(metrics.nlv_goal)}</p></div>
+                        <div class="col-md-6 col-lg-4 mb-4"><h6 class="text-center mb-2">Monthly Income Goal</h6><div class="chart-container" style="height:220px;"><canvas id="monthlyIncomeGoalChart"></canvas><div id="monthlyIncomeGoalChartFallback" class="chart-fallback-text" style="display:none;">Set Monthly Goal.</div></div><p class="text-center mt-2 mb-0 small">Est. Monthly: ${formatCurrency(metrics.monthly_estimate)}<br>Goal: ${formatCurrency(metrics.monthly_goal)}</p></div>
+                        <div class="col-md-12 col-lg-4 mb-4"><h6 class="text-center mb-2">Returns vs. Goal</h6><div class="chart-container" style="height:180px;"><canvas id="navGoalChart"></canvas><div id="navGoalChartFallback" class="chart-fallback-text" style="display:none;">Data unavailable.</div></div><p class="text-center mt-2 mb-0 small">NAV: ${metrics.nav_return_total.toFixed(2)}% | Total: ${metrics.total_return_after_tax_dividends_perc.toFixed(2)}% | Goal: ${metrics.nav_goal.toFixed(2)}%</p></div>
+                    </div></div>
+                </div>
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center"><span>Key Financials</span><small class="text-muted" style="font-size: 0.8em;">Data as of: <span id="last-data-pull-timestamp" data-iso-timestamp="${data.last_data_pull}">...</span></small></div>
+                    <div class="card-body"><div class="row text-center">
+                        <div class="col-lg col-md-4 col-sm-6 mb-3"><h5>Portfolio Value</h5><p class="fs-4 text-info">${formatCurrency(metrics.portfolio_value)}</p></div>
+                        <div class="col-lg col-md-4 col-sm-6 mb-3"><h5>Margin Used</h5><p class="fs-4 text-warning">${formatCurrency(metrics.current_margin_used)}</p>${metrics.portfolio_value > 0 ? `<small class="text-muted d-block">(${metrics.margin_percentage_of_portfolio.toFixed(2)}% of Portfolio)</small>` : ''}</div>
+                        <div class="col-lg col-md-4 col-sm-6 mb-3"><h5>Est. Daily Margin Interest</h5><p class="fs-4 text-danger">${formatCurrency(metrics.estimated_daily_interest)}</p></div>
+                        <div class="col-lg col-md-6 col-sm-6 mb-3"><h5>Total Dividends Received</h5><p class="fs-4 text-success">${formatCurrency(metrics.total_dividends_received)}</p><small class="text-muted">(Pre-Tax, Historical)</small></div>
+                        <div class="col-lg col-md-6 col-sm-6 mb-3"><h5>Taxes to Withhold (Est.)</h5><p class="fs-4 text-danger">${formatCurrency(metrics.taxes_to_withhold_est)}</p><small class="text-muted">(${metrics.marginal_tax_rate.toFixed(0)}% of Hist. Dividends)</small></div>
+                        <div class="col-lg col-md-12 col-sm-12 mb-3"><h5>% to House Money</h5><p class="fs-4 ${metrics.percent_to_house_money >= 100 ? 'text-success' : (metrics.percent_to_house_money > 0 ? 'text-warning' : 'text-light')}">${metrics.percent_to_house_money.toFixed(2)}%</p><small class="text-muted">(Post-Tax Divs / Invested)</small></div>
+                    </div></div>
+                </div>
+                <div class="card mb-4"><div class="card-header d-flex justify-content-between align-items-center"><span>🗓️ Dividend Payment History</span><div class="btn-group btn-group-sm" role="group" id="dividendChartTimeframe"><button type="button" class="btn btn-outline-secondary" data-range="2w">2W</button><button type="button" class="btn btn-outline-secondary" data-range="4w">4W</button><button type="button" class="btn btn-outline-secondary" data-range="12w">12W</button><button type="button" class="btn btn-outline-secondary" data-range="26w">26W</button><button type="button" class="btn btn-outline-secondary" data-range="52w">52W</button><button type="button" class="btn btn-outline-secondary active" data-range="all">All</button></div></div><div class="card-body"><div class="chart-container" style="height:300px; max-width:100%;"><canvas id="dividendPaymentsChart"></canvas><div id="dividendPaymentsChartFallback" class="chart-fallback-text" style="display:none;">No dividend payment history.</div></div></div></div>
+                <div class="card mb-4"><div class="card-header">📊 Portfolio Summary (by Ticker)</div><div class="card-body table-responsive"><table class="table table-striped table-hover table-sm sortable" id="portfolio-summary-table"><thead><tr><th>Ticker</th><th># Shares</th><th>Avg Cost</th><th>Curr Price</th><th>Port. %</th><th>Divs Rec.</th><th>NAV Return</th></tr></thead><tbody>${portfolioSummary.map(item => `<tr><td><strong>${item.ticker}</strong></td><td>${Number(item.shares).toFixed(2)}</td><td>${formatCurrency(item.average_cost)}</td><td>${formatCurrency(item.current_price)}</td><td>${Number(item.portfolio_percentage).toFixed(2)}%</td><td>${formatCurrency(item.dividends_received)}</td><td><span class="${item.nav_return_ticker >= 0 ? 'text-success' : 'text-danger'}">${item.nav_return_ticker.toFixed(2)}%</span></td></tr>`).join('')}</tbody></table></div></div>
+                <div class="card mb-4"><div class="card-header">📑 Lots Details</div><div class="card-body table-responsive"><table class="table table-striped table-hover table-sm sortable" id="lots-details-table"><thead><tr><th>Ticker</th><th>Purch. Date</th><th>Shares</th><th>Price Paid</th><th>Total Cost</th><th>Curr. Price</th><th>Curr. Value</th><th>Divs Rec.</th><th>NAV Return</th></tr></thead><tbody>${lotsData.map(lot => `<tr><td><strong>${lot.ticker}</strong></td><td>${new Date(lot.purchase_date).toLocaleDateString()}</td><td>${Number(lot.shares).toFixed(2)}</td><td>${formatCurrency(lot.price_paid)}</td><td>${formatCurrency(lot.total_cost)}</td><td>${formatCurrency(lot.current_price)}</td><td>${formatCurrency(lot.current_value)}</td><td>${formatCurrency(lot.dividends_received)}</td><td><span class="${lot.nav_return >= 0 ? 'text-success' : 'text-danger'}">${lot.nav_return.toFixed(2)}%</span></td></tr>`).join('')}</tbody></table></div></div>
+            `;
+            dashboardContent.innerHTML = contentHTML;
+        }
+        
+        function initializeCharts(data) {
+            Chart.register(ChartDataLabels, ChartZoom); 
+            Chart.defaults.color = '#cccccc'; Chart.defaults.borderColor = '#444444'; 
+
+            const chartTextColor = '#e0e0e0', chartGridColor = 'rgba(255, 255, 255, 0.1)', goalReachedColor = '#28a745', goalExceededColor = '#0dcaf0', totalReturnColor = '#6f42c1', remainingColor = '#444444', dividendBarColor = '#17a2b8';
+            
+            if (!data.metrics) return; 
+            const metricsData = data.metrics;
+
+            // NLV Goal Chart
+            const nlvGoalCtx = document.getElementById('nlvGoalChart'), nlvGoalChartFallback = document.getElementById('nlvGoalChartFallback');
+            if (nlvGoalCtx && metricsData.nlv_goal > 0) {
+                nlvGoalChartFallback.style.display = 'none'; nlvGoalCtx.style.display = 'block';
+                const nlvRemaining = Math.max(0, metricsData.nlv_goal - metricsData.net_liquidation_value);
+                const nlvProgress = Math.min((metricsData.net_liquidation_value / metricsData.nlv_goal) * 100, 100);
+                new Chart(nlvGoalCtx, { type: 'doughnut', data: { labels: ['Achieved NLV', 'Remaining'], datasets: [{ data: [metricsData.net_liquidation_value, nlvRemaining], backgroundColor: [goalReachedColor, remainingColor], borderColor: ['#1e1e1e', '#1e1e1e'], borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => formatCurrency(c.raw) }}, datalabels: { formatter: (v, c) => (c.dataIndex === 0 ? formatPercent(nlvProgress) : ''), color: chartTextColor, font: { weight: 'bold', size: 16 }}}} });
+            } else if (nlvGoalCtx) { nlvGoalCtx.style.display = 'none'; nlvGoalChartFallback.style.display = 'block'; }
+
+            // Monthly Income Goal Chart
+            const monthlyIncomeGoalCtx = document.getElementById('monthlyIncomeGoalChart'), monthlyIncomeGoalChartFallback = document.getElementById('monthlyIncomeGoalChartFallback');
+            if (monthlyIncomeGoalCtx && metricsData.monthly_goal > 0) {
+                monthlyIncomeGoalChartFallback.style.display = 'none'; monthlyIncomeGoalCtx.style.display = 'block';
+                const incomeRemaining = Math.max(0, metricsData.monthly_goal - metricsData.monthly_estimate);
+                const incomeProgress = Math.min((metricsData.monthly_estimate / metricsData.monthly_goal) * 100, 100);
+                new Chart(monthlyIncomeGoalCtx, { type: 'doughnut', data: { labels: ['Achieved Income', 'Remaining'], datasets: [{ data: [metricsData.monthly_estimate, incomeRemaining], backgroundColor: [goalReachedColor, remainingColor], borderColor: ['#1e1e1e', '#1e1e1e'], borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => formatCurrency(c.raw) }}, datalabels: { formatter: (v, c) => (c.dataIndex === 0 ? formatPercent(incomeProgress) : ''), color: chartTextColor, font: { weight: 'bold', size: 16 }}}} });
+            } else if (monthlyIncomeGoalCtx) { monthlyIncomeGoalCtx.style.display = 'none'; if(monthlyIncomeGoalChartFallback) monthlyIncomeGoalChartFallback.style.display = 'block'; }
+
+            // Returns vs. Goal Chart
+            const navGoalCtx = document.getElementById('navGoalChart'), navGoalChartFallback = document.getElementById('navGoalChartFallback');
+            if (navGoalCtx && metricsData.nav_goal !== null) { 
+                navGoalChartFallback.style.display = 'none'; navGoalCtx.style.display = 'block';
+                new Chart(navGoalCtx, { type: 'bar', data: { labels: ['Returns'], datasets: [ { label: 'NAV Return', data: [metricsData.nav_return_total], backgroundColor: metricsData.nav_return_total >= metricsData.nav_goal ? goalExceededColor : (metricsData.nav_return_total >= 0 ? goalReachedColor : '#dc3545')}, { label: 'Total Return (Post-Tax Divs)', data: [metricsData.total_return_after_tax_dividends_perc], backgroundColor: totalReturnColor}, { label: 'NAV Goal', data: [metricsData.nav_goal], backgroundColor: 'rgba(200, 200, 200, 0.3)'} ] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: chartTextColor, callback: (v) => `${v.toFixed(1)}%` }}, y: { ticks: { display: false }}}, plugins: { legend: { display: true, position: 'bottom', labels: {color: chartTextColor} }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.raw.toFixed(2)}%` }}, datalabels: { anchor: 'end', align: 'end', formatter: (v) => `${v.toFixed(1)}%`, color: chartTextColor, font: { weight: 'bold' }}}} });
+            } else if (navGoalCtx) { navGoalCtx.style.display = 'none'; navGoalChartFallback.style.display = 'block'; }
+            
+            // Dividend Payments History Chart
+            const dividendChartData = data.dividend_chart_data;
+            const dividendPaymentsCtx = document.getElementById('dividendPaymentsChart'), dividendPaymentsFallback = document.getElementById('dividendPaymentsChartFallback');
+            if (dividendPaymentsCtx && dividendChartData && dividendChartData.labels && dividendChartData.labels.length > 0) {
+                dividendPaymentsFallback.style.display = 'none'; dividendPaymentsCtx.style.display = 'block';
+                const tickerColors = {}; const palette = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796', '#5a5c69', '#f8f9fc']; let colorIndex = 0;
+                dividendChartData.datasets.forEach(dataset => { if (!tickerColors[dataset.label]) { tickerColors[dataset.label] = palette[colorIndex % palette.length]; colorIndex++; } dataset.backgroundColor = tickerColors[dataset.label]; });
+                const dividendChart = new Chart(dividendPaymentsCtx, { type: 'bar', data: { labels: dividendChartData.labels, datasets: dividendChartData.datasets }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, type: 'time', time: { unit: 'week', tooltipFormat: 'MMM dd, yy' }, ticks: { color: chartTextColor }, grid: { color: chartGridColor }}, y: { stacked: true, beginAtZero: true, ticks: { color: chartTextColor, callback: function(value) { return formatCurrency(value); }}, grid: { color: chartGridColor }}}, plugins: { legend: { display: true, position: 'bottom', labels: { color: chartTextColor, boxWidth: 15 } }, tooltip: { mode: 'index', intersect: false, callbacks: { label: function(c) { return `${c.dataset.label}: ${formatCurrency(c.raw)}`; }}}, datalabels: { display: false }, zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }}} } });
+                document.getElementById('dividendChartTimeframe').addEventListener('click', function(e) {
+                    if (e.target.tagName === 'BUTTON') {
+                        const range = e.target.dataset.range; const now = new Date(); let minDate;
+                        this.querySelectorAll('button').forEach(btn => btn.classList.remove('active')); e.target.classList.add('active');
+                        if (range === 'all') { minDate = null; } 
+                        else { const tempDate = new Date(); const num = parseInt(range.replace('w', '')); tempDate.setDate(now.getDate() - (num * 7)); minDate = tempDate; }
+                        dividendChart.options.scales.x.min = minDate ? minDate.getTime() : null;
+                        dividendChart.options.scales.x.max = now.getTime();
+                        dividendChart.update();
+                    }
+                });
+            } else if (dividendPaymentsCtx) { dividendPaymentsCtx.style.display = 'none'; if(dividendPaymentsFallback) dividendPaymentsFallback.style.display = 'block'; }
+        }
+
+        function makeTablesSortable() {
+            const getCellValue = (tr, idx) => {
+                const cell = tr.children[idx];
+                if (!cell) return '';
+                return cell.innerText.replace(/[$%,]/g, '') || cell.textContent.replace(/[$%,]/g, '');
+            };
+            const comparer = (idx, asc) => (a, b) => {
+                const vA = getCellValue(asc ? a : b, idx); const vB = getCellValue(asc ? b : a, idx);
+                if (vA === 'N/A') return asc ? 1 : -1; if (vB === 'N/A') return asc ? -1 : 1;
+                if (vA !== '' && vB !== '' && !isNaN(vA) && !isNaN(vB)) { return vA - vB; }
+                if (idx === 1 && !isNaN(Date.parse(vA)) && !isNaN(Date.parse(vB))) { return new Date(vA) - new Date(vB); }
+                return vA.toString().localeCompare(vB);
+            };
+            document.querySelectorAll('table.sortable th').forEach(th => {
+                let asc = true;
+                th.addEventListener('click', () => {
+                    const table = th.closest('table'); const tbody = table.querySelector('tbody');
+                    const thIndex = Array.from(th.parentNode.children).indexOf(th);
+                    Array.from(tbody.querySelectorAll('tr')).sort(comparer(thIndex, asc)).forEach(tr => tbody.appendChild(tr));
+                    table.querySelectorAll('th').forEach(h => h.innerHTML = h.innerHTML.replace(/ (↑|↓)$/, ''));
+                    th.innerHTML += asc ? ' ↑' : ' ↓'; asc = !asc;
+                });
+            });
+        }
+        
+        function localizeTimestamp(isoTimestamp) {
+             const timestampEl = document.getElementById('last-data-pull-timestamp');
+            if (timestampEl && isoTimestamp) {
+                const localDate = new Date(isoTimestamp);
+                timestampEl.innerText = localDate.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+            }
+        }
+    });
+    </script>
+    {% endif %}
+{% endblock %}

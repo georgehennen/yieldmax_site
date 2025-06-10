@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}ETF Screener - YieldMax Tracker{% endblock %}
+{% block page_title %}YieldMax ETF Screener{% endblock %}
+{% block page_actions %}{% endblock %}
+
+{% block content %}
+<!-- Collapsible Filter Section -->
+<div class="accordion mb-4" id="filterAccordion">
+    <div class="accordion-item bg-dark">
+        <h2 class="accordion-header" id="headingOne">
+            <button class="accordion-button bg-dark text-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                <i class="bi bi-funnel-fill me-2"></i> Filter Options
+            </button>
+        </h2>
+        <div id="collapseOne" class="accordion-collapse collapse show" aria-labelledby="headingOne" data-bs-parent="#filterAccordion">
+            <div class="accordion-body">
+                <form id="screener-filter-form">
+                    <div class="row">
+                        <div class="col-lg-4 mb-3">
+                            <label class="form-label fw-bold">{{ form.strategy.label }}</label>
+                            <div id="strategy-filter">
+                            {% for choice in form.strategy %}
+                                <div class="form-check form-check-inline">
+                                    {{ choice.tag }}
+                                    <label for="{{ choice.id_for_label }}" class="form-check-label">{{ choice.choice_label }}</label>
+                                </div>
+                            {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-6 mb-3">
+                            <label for="{{ form.dividend_frequency.id_for_label }}" class="form-label fw-bold">{{ form.dividend_frequency.label }}</label>
+                            {{ form.dividend_frequency }}
+                        </div>
+                        <div class="col-lg-4 col-md-6 mb-3">
+                             <label for="{{ form.min_yield.id_for_label }}" class="form-label fw-bold">{{ form.min_yield.label }}</label>
+                             {{ form.min_yield }}
+                        </div>
+                        <div class="col-lg-4 col-md-6 mb-3">
+                            <label for="{{ form.max_pvlm.id_for_label }}" class="form-label fw-bold">{{ form.max_pvlm.label }}</label>
+                            {{ form.max_pvlm }}
+                        </div>
+                        <div class="col-lg-4 col-md-6 mb-3">
+                            <label for="{{ form.max_from_6m_high.id_for_label }}" class="form-label fw-bold">{{ form.max_from_6m_high.label }}</label>
+                            {{ form.max_from_6m_high }}
+                        </div>
+                        <div class="col-lg-4 col-md-6 mb-3">
+                            <label for="{{ form.min_to_target.id_for_label }}" class="form-label fw-bold">{{ form.min_to_target.label }}</label>
+                            {{ form.min_to_target }}
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="button" id="reset-filters-btn" class="btn btn-outline-secondary me-2">Reset Filters</button>
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Results Table Area -->
+<div id="results-area">
+    <div id="screener-loading-spinner" class="text-center mt-5">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Fetching ETF data...</p>
+    </div>
+
+    <div id="screener-results-content" style="display: none;">
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card">
+                     <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Showing <span id="etf-count">0</span> ETF(s)</span>
+                        <small class="text-muted" style="font-size: 0.8em;">
+                            Data as of: <span id="last-data-pull-timestamp">...</span>
+                        </small>
+                    </div>
+                    <div class="card-body table-responsive">
+                        <table class="table table-striped table-hover table-sm sortable" id="screener-table">
+                            <thead>
+                                <tr>
+                                    <th>Ticker</th><th>Underlying</th><th>Strategy</th><th>Price</th><th>Yield</th><th>Price vs LM</th>
+                                    <th>Next Ex-Date</th><th>Und. Price</th><th>Und. Target</th><th>Und. % from 6M High</th><th>Und. % to Target</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const filterForm = document.getElementById('screener-filter-form');
+        const resultsContent = document.getElementById('screener-results-content');
+        const loadingSpinner = document.getElementById('screener-loading-spinner');
+        const tableBody = document.querySelector('#screener-table tbody');
+        const etfCountSpan = document.getElementById('etf-count');
+        const timestampSpan = document.getElementById('last-data-pull-timestamp');
+        const resetBtn = document.getElementById('reset-filters-btn');
+
+        function fetchAndRenderData() {
+            loadingSpinner.style.display = 'block';
+            resultsContent.style.display = 'none';
+
+            const formData = new FormData(filterForm);
+            const params = new URLSearchParams(formData);
+
+            const strategyCheckboxes = document.querySelectorAll('#strategy-filter input[name="strategy"]:checked');
+            params.delete('strategy'); 
+            strategyCheckboxes.forEach(cb => params.append('strategy', cb.value));
+
+            const url = `{% url 'screener:get_screener_data' %}?${params.toString()}`;
+            console.log("Fetching data from:", url);
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Received data:", data);
+                    renderTable(data);
+                })
+                .catch(error => {
+                    console.error("Fetch error:", error);
+                    loadingSpinner.innerHTML = `<div class="alert alert-danger">Failed to load screener data. Please try again.</div>`;
+                });
+        }
+        
+        function renderTable(data) {
+            loadingSpinner.style.display = 'none';
+            resultsContent.style.display = 'block';
+
+            etfCountSpan.textContent = data.etfs.length;
+            if (data.last_data_pull) {
+                const localDate = new Date(data.last_data_pull);
+                timestampSpan.textContent = localDate.toLocaleString(undefined, {
+                    month: 'short', day: 'numeric', year: 'numeric', 
+                    hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+                });
+            }
+
+            tableBody.innerHTML = ''; 
+            if (data.etfs.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="11" class="text-center py-4">No ETFs match your filter criteria.</td></tr>';
+                return;
+            }
+
+            data.etfs.forEach(etf => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${etf.ticker}</strong></td>
+                    <td>${etf.underlying_asset}</td>
+                    <td>${etf.strategy}</td>
+                    <td>$${etf.current_price ? etf.current_price.toFixed(2) : 'N/A'}</td>
+                    <td>${etf.annual_yield_percentage ? etf.annual_yield_percentage.toFixed(2) : 'N/A'}%</td>
+                    <td>${etf.price_vs_lower_median_percentage ? etf.price_vs_lower_median_percentage.toFixed(2) : 'N/A'}%</td>
+                    <td>${etf.next_ex_dividend_date || 'N/A'}</td>
+                    <td>${etf.underlying_price ? '$' + etf.underlying_price.toFixed(2) : 'N/A'}</td>
+                    <td>${etf.underlying_target_price ? '$' + etf.underlying_target_price.toFixed(2) : 'N/A'}</td>
+                    <td>${etf.underlying_percent_from_6m_high ? etf.underlying_percent_from_6m_high.toFixed(2) + '%' : 'N/A'}</td>
+                    <td>${etf.underlying_percent_to_target ? etf.underlying_percent_to_target.toFixed(2) + '%' : 'N/A'}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+            // This is the fix: Re-apply the sorting logic AFTER the table is built.
+            makeTablesSortable();
+        }
+
+        filterForm.addEventListener('submit', function (e) {
+            e.preventDefault(); 
+            fetchAndRenderData();
+        });
+        
+        resetBtn.addEventListener('click', function() {
+            window.location.href = "{% url 'screener:index' %}";
+        });
+
+        // Initial data load on page ready
+        fetchAndRenderData();
+
+        function makeTablesSortable() {
+            const getCellValue = (tr, idx) => {
+                const cell = tr.children[idx];
+                if (!cell) return '';
+                let text = cell.innerText || cell.textContent;
+                return text.replace(/[$%,]/g, '');
+            };
+            const comparer = (idx, asc) => (a, b) => {
+                const vA = getCellValue(asc ? a : b, idx);
+                const vB = getCellValue(asc ? b : a, idx);
+                if (vA === 'N/A') return 1; // Always sort N/A to the bottom
+                if (vB === 'N/A') return -1;
+                const nA = Number(vA);
+                const nB = Number(vB);
+                if (!isNaN(nA) && !isNaN(nB)) { return nA - nB; }
+                if (!isNaN(Date.parse(vA)) && !isNaN(Date.parse(vB))) { return new Date(vA) - new Date(vB); }
+                return vA.toString().localeCompare(vB);
+            };
+            document.querySelectorAll('table.sortable thead th').forEach(th => {
+                th.style.cursor = 'pointer'; // Add pointer cursor
+                let asc = th.getAttribute('data-sort-dir') !== 'asc';
+                th.addEventListener('click', () => {
+                    const table = th.closest('table');
+                    const tbody = table.querySelector('tbody');
+                    const thIndex = Array.from(th.parentNode.children).indexOf(th);
+                    
+                    Array.from(tbody.querySelectorAll('tr'))
+                        .sort(comparer(thIndex, asc))
+                        .forEach(tr => tbody.appendChild(tr));
+
+                    table.querySelectorAll('th').forEach(h => h.removeAttribute('data-sort-dir'));
+                    th.setAttribute('data-sort-dir', asc ? 'asc' : 'desc');
+
+                    table.querySelectorAll('th').forEach(h => h.innerHTML = h.innerHTML.replace(/ (↑|↓)$/, ''));
+                    th.innerHTML += asc ? ' ↑' : ' ↓';
+                    
+                    asc = !asc;
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}

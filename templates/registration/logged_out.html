@@ -1,0 +1,17 @@
+{% extends "base_auth.html" %}
+
+{% block title %}Logged Out - YieldMax Tracker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body text-center">
+                <h4 class="card-title">You have been successfully logged out.</h4>
+                <p>Thank you for using YieldMax Tracker.</p>
+                <a href="{% url 'login' %}" class="btn btn-primary mt-3">Login Again</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

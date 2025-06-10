@@ -1,0 +1,50 @@
+/* Custom CSS for YieldMax Tracker */
+
+.highlight-metric {
+    font-weight: bold;
+    color: #0dcaf0; /* Bootstrap info color */
+}
+
+.table-sm th, .table-sm td {
+    padding: 0.5rem; /* Adjust padding for compact tables */
+}
+
+/* Make sortable table headers look clickable */
+table.sortable th {
+    cursor: pointer;
+}
+table.sortable th:hover {
+    background-color: #3a3a3a;
+}
+
+
+.navbar .dropdown-menu {
+    background-color: #1e1e1e; 
+    border: 1px solid #333333;
+}
+.navbar .dropdown-item {
+    color: #cccccc;
+}
+.navbar .dropdown-item:hover,
+.navbar .dropdown-item:focus {
+    color: #ffffff;
+    background-color: #2a2a2a;
+}
+.navbar .dropdown-divider {
+    border-top-color: #333333;
+}
+
+/* Message Styling */
+.alert-success { background-color: #198754; color: white; border-color: #198754; }
+.alert-warning { background-color: #ffc107; color: #343a40; border-color: #ffc107; }
+.alert-danger { background-color: #dc3545; color: white; border-color: #dc3545; }
+.alert-info { background-color: #0dcaf0; color: white; border-color: #0dcaf0; }
+
+.modal-footer {
+    border-top: 1px solid #333333 !important;
+}
+
+/* Chart fallback text styling */
+.chart-fallback-text {
+    /* Styles are in base.html for now */
+}
