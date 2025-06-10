@@ -26,12 +26,16 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 # The value 'False' should be a string, as environment variables are strings.
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['https://yieldmaxsite-production.up.railway.app']
+ALLOWED_HOSTS = []
+CSRF_TRUSTED_ORIGINS = [] # New list for trusted origins
+
 RAILWAY_STATIC_URL = os.environ.get('RAILWAY_STATIC_URL')
 if RAILWAY_STATIC_URL:
     # The URL from Railway won't include https://
     # It will be something like a-service-name.up.railway.app
     ALLOWED_HOSTS.append(RAILWAY_STATIC_URL)
+    # For CSRF, we must provide the full URL with the scheme
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RAILWAY_STATIC_URL}")
 
 
 # Application definition
