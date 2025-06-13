@@ -48,6 +48,8 @@ def get_live_etf_metrics(etf):
                     underlying_price = Decimal(str(hist['Close'][-1]))
                     high_6mo = Decimal(str(hist['High'].max()))
                     underlying_target = u_stock.info.get('targetMeanPrice')
+                    print(f"{etf.underlying_asset}: {u_stock.info.get('targetMeanPrice')}")
+                    print(u_stock.analyst_price_targets)
                     if underlying_target: underlying_target = Decimal(str(underlying_target))
                     if underlying_price and high_6mo: underlying_drop_pct = ((underlying_price - high_6mo) / high_6mo) * 100
                     if underlying_price and underlying_target: underlying_to_target_pct = ((underlying_target - underlying_price) / underlying_price) * 100

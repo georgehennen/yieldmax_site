@@ -187,37 +187,27 @@ def get_portfolio_data_api(request):
     try:
         # Fetch SPY data for the required period
         spy_data = yf.download('SPY', start=start_date, end=now().date() + timedelta(days=1), auto_adjust=False, progress=False)
-        
-        print(spy_data.head(4))
+    
         spy_adj_close = spy_data['Adj Close'].dropna()
-        print(spy_adj_close)
         if spy_adj_close.empty:
             raise ValueError("SPY 'Adj Close' data is empty after dropping NaNs.")
 
         # --- Safe Data Extraction ---
         spy_start_price_raw = spy_adj_close.iloc[0].item()
         spy_end_price_raw = spy_adj_close.iloc[-1].item()
-
-        print(f"SPY START PRICE RAW{spy_start_price_raw}")
-        print(f"SPY END PRICE RAW{spy_end_price_raw}")
         
         # Convert to Decimal safely, handling potential non-numeric data
         spy_start_price = Decimal(str(spy_start_price_raw))
         spy_end_price = Decimal(str(spy_end_price_raw))
-        
-        print(f"SPY START PRICE {spy_start_price}")
-        print(f"SPY END PRICE {spy_end_price}")
+
         # Calculate SPY total return
         if spy_start_price > 0:
             spy_total_return = ((spy_end_price) / spy_start_price - 1) * 100
         else:
             spy_total_return = Decimal(0)
 
-        print(f"SPY TOTAL RETURN {spy_total_return}")
-
         # Portfolio total return is already calculated
         portfolio_total_return = current_metrics['total_return_after_tax_dividends_perc']
-        print(f"portfolio TOTAL RETURN {portfolio_total_return}")
 
         # Format data for a bar chart
         performance_chart_data = {
