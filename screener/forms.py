@@ -7,15 +7,20 @@ class ScreenerFilterForm(forms.Form):
         choices=ETF.Strategy.choices,
         widget=forms.CheckboxSelectMultiple,
         required=False,
-        initial=[ETF.Strategy.BULLISH, ETF.Strategy.BEARISH]
+        initial=[
+            ETF.Strategy.BULLISH,
+            ETF.Strategy.BULLISH_LEVERAGED,
+            ETF.Strategy.BEARISH
+        ]
     )
     
-    dividend_frequency = forms.ChoiceField(
-        choices=[('All', 'All')] + ETF.Frequency.choices,
+    fund_issuer = forms.MultipleChoiceField(
+        choices=ETF.FundIssuer.choices,
+        widget=forms.CheckboxSelectMultiple,
         required=False,
-        initial='All'
+        label="Fund Issuer"
     )
-    
+
     min_yield = forms.FloatField(
         label="Min Annual Yield (%)",
         required=False,

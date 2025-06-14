@@ -34,10 +34,12 @@ def get_live_etf_metrics(etf):
         percentvlower = ((price_dec - lower_median) / lower_median) * 100 if lower_median else Decimal(0)
         last_div_date = divs.index[-1].date() if not divs.empty else None
         last_div = Decimal(str(divs.iloc[-1])) if not divs.empty else Decimal(0)
-        freq_days = 7 if etf.dividend_frequency == ETF.Frequency.WEEKLY else 28
-        next_date = last_div_date + timedelta(days=freq_days) if last_div_date else None
-        div_multiplier = 52 if etf.dividend_frequency == ETF.Frequency.WEEKLY else 13
+        #--
+        freq_days = etf.days_between_last_ex_dates()
+        next_date = last_div_date + timedelta(days=freq_days) if last_div_date and freq_days else None
+        div_multiplier = Decimal('365') / Decimal(freq_days) if freq_days and freq_days > 0 else Decimal(0)
         annual_yield = (last_div / price_dec) * Decimal(div_multiplier) * 100 if price_dec else Decimal(0)
+        #--
         underlying_price, underlying_target, underlying_drop_pct, underlying_to_target_pct = None, None, None, None
         if etf.underlying_asset and etf.underlying_asset not in ['Unknown', 'Other', 'Multiple']:
             try:
@@ -45,21 +47,27 @@ def get_live_etf_metrics(etf):
                 six_months_ago = date.today() - timedelta(days=182)
                 hist = u_stock.history(start=six_months_ago)
                 if not hist.empty:
-                    underlying_price = Decimal(str(hist['Close'][-1]))
+                    underlying_price = Decimal(str(hist['Close'].iloc[-1]))
                     high_6mo = Decimal(str(hist['High'].max()))
                     underlying_target = u_stock.info.get('targetMeanPrice')
-                    print(f"{etf.underlying_asset}: {u_stock.info.get('targetMeanPrice')}")
-                    print(u_stock.analyst_price_targets)
                     if underlying_target: underlying_target = Decimal(str(underlying_target))
                     if underlying_price and high_6mo: underlying_drop_pct = ((underlying_price - high_6mo) / high_6mo) * 100
                     if underlying_price and underlying_target: underlying_to_target_pct = ((underlying_target - underlying_price) / underlying_price) * 100
             except Exception as e: print(f"Could not fetch underlying data for {etf.underlying_asset}: {e}")
         return {
-            'ticker': ticker, 'underlying_asset': etf.underlying_asset, 'strategy': etf.strategy, 
-            'dividend_frequency': etf.dividend_frequency, 'current_price': price_dec,
-            'annual_yield_percentage': annual_yield, 'price_vs_lower_median_percentage': percentvlower,
-            'next_ex_dividend_date': next_date, 'underlying_price': underlying_price,
-            'underlying_target_price': underlying_target, 'underlying_percent_from_6m_high': underlying_drop_pct,
+            'ticker': ticker,
+            'underlying_asset': etf.underlying_asset,
+            'strategy': etf.strategy,
+            'description': etf.description,
+            'fund_issuer': etf.fund_issuer,
+            'dividend_frequency': freq_days,
+            'current_price': price_dec,
+            'annual_yield_percentage': annual_yield,
+            'price_vs_lower_median_percentage': percentvlower,
+            'next_ex_dividend_date': next_date,
+            'underlying_price': underlying_price,
+            'underlying_target_price': underlying_target,
+            'underlying_percent_from_6m_high': underlying_drop_pct,
             'underlying_percent_to_target': underlying_to_target_pct,
         }
     except Exception as e:
@@ -84,27 +92,27 @@ def get_screener_data_api(request):
     if form.is_valid():
         strategy = form.cleaned_data.get('strategy')
         if strategy: filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('strategy') in strategy]
-        
-        dividend_frequency = form.cleaned_data.get('dividend_frequency')
-        if dividend_frequency and dividend_frequency != 'All':
-            filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('dividend_frequency') == dividend_frequency]
-            
+
+        description = form.cleaned_data.get('description')
+        if description: filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('description') in description]
+
+        fund_issuer = form.cleaned_data.get('fund_issuer')
+        if fund_issuer:
+            filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('fund_issuer') in fund_issuer]
+
+
         min_yield = form.cleaned_data.get('min_yield')
-        if min_yield is not None:
-            filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('annual_yield_percentage') is not None and d['annual_yield_percentage'] >= Decimal(min_yield)]
+        if min_yield is not None: filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('annual_yield_percentage') is not None and d['annual_yield_percentage'] >= Decimal(min_yield)]
         
         # Updated filtering logic based on the modified form
         max_pvlm = form.cleaned_data.get('max_pvlm')
-        if max_pvlm is not None:
-             filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('price_vs_lower_median_percentage') is not None and d['price_vs_lower_median_percentage'] <= Decimal(max_pvlm)]
+        if max_pvlm is not None: filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('price_vs_lower_median_percentage') is not None and d['price_vs_lower_median_percentage'] <= Decimal(max_pvlm)]
 
         max_from_6m_high = form.cleaned_data.get('max_from_6m_high')
-        if max_from_6m_high is not None:
-            filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('underlying_percent_from_6m_high') is not None and d['underlying_percent_from_6m_high'] <= Decimal(max_from_6m_high)]
+        if max_from_6m_high is not None: filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('underlying_percent_from_6m_high') is not None and d['underlying_percent_from_6m_high'] <= Decimal(max_from_6m_high)]
 
         min_to_target = form.cleaned_data.get('min_to_target')
-        if min_to_target is not None:
-            filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('underlying_percent_to_target') is not None and d['underlying_percent_to_target'] >= Decimal(min_to_target)]
+        if min_to_target is not None: filtered_data = [d for d in filtered_data if isinstance(d, dict) and d.get('underlying_percent_to_target') is not None and d['underlying_percent_to_target'] >= Decimal(min_to_target)]
             
     response_data = {'etfs': filtered_data, 'last_data_pull': last_data_pull}
     return JsonResponse(response_data, encoder=ExtendedEncoder)

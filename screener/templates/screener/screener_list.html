@@ -29,6 +29,17 @@
                             {% endfor %}
                             </div>
                         </div>
+                        <div class="col-lg-4 mb-3">
+                            <label class="form-label fw-bold">{{ form.fund_issuer.label }}</label>
+                            <div id="issuer-filter">
+                                {% for choice in form.fund_issuer %}
+                                    <div class="form-check form-check-inline">
+                                        {{ choice.tag }}
+                                        <label for="{{ choice.id_for_label }}" class="form-check-label">{{ choice.choice_label }}</label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>                                               
                         <div class="col-lg-4 col-md-6 mb-3">
                             <label for="{{ form.dividend_frequency.id_for_label }}" class="form-label fw-bold">{{ form.dividend_frequency.label }}</label>
                             {{ form.dividend_frequency }}
@@ -84,8 +95,8 @@
                         <table class="table table-striped table-hover table-sm sortable" id="screener-table">
                             <thead>
                                 <tr>
-                                    <th>Ticker</th><th>Underlying</th><th>Strategy</th><th>Price</th><th>Yield</th><th>Price vs LM</th>
-                                    <th>Next Ex-Date</th><th>Und. Price</th><th>Und. Target</th><th>Und. % from 6M High</th><th>Und. % to Target</th>
+                                    <th>Ticker</th><th>Issuer</th><th>Underlying</th><th>Strategy</th><th>Price</th><th>Yield</th><th>Price vs LM</th>
+                                    <th>Next Ex-Date</th><th>Und. Price</th><th>Und. Target</th><th>Und. % from 6M High</th><th>Und. % to Target</th><th>Description</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -120,6 +131,10 @@
             const strategyCheckboxes = document.querySelectorAll('#strategy-filter input[name="strategy"]:checked');
             params.delete('strategy'); 
             strategyCheckboxes.forEach(cb => params.append('strategy', cb.value));
+
+            const issuerCheckboxes = document.querySelectorAll('#issuer-filter input[name="fund_issuer"]:checked');
+            params.delete('fund_issuer');
+            issuerCheckboxes.forEach(cb => params.append('fund_issuer', cb.value));
 
             const url = `{% url 'screener:get_screener_data' %}?${params.toString()}`;
             console.log("Fetching data from:", url);
@@ -162,6 +177,7 @@
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td><strong>${etf.ticker}</strong></td>
+                    <td><strong>${etf.fund_issuer || 'N/A'}</strong></td>
                     <td>${etf.underlying_asset}</td>
                     <td>${etf.strategy}</td>
                     <td>$${etf.current_price ? etf.current_price.toFixed(2) : 'N/A'}</td>
@@ -172,6 +188,7 @@
                     <td>${etf.underlying_target_price ? '$' + etf.underlying_target_price.toFixed(2) : 'N/A'}</td>
                     <td>${etf.underlying_percent_from_6m_high ? etf.underlying_percent_from_6m_high.toFixed(2) + '%' : 'N/A'}</td>
                     <td>${etf.underlying_percent_to_target ? etf.underlying_percent_to_target.toFixed(2) + '%' : 'N/A'}</td>
+                    <td>${etf.description || 'N/A'}</td>
                 `;
                 tableBody.appendChild(row);
             });
